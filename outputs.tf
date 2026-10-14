@@ -13,3 +13,20 @@ output "resource_group_id" {
   description = "Azure resource group resource ID"
   value       = azurerm_resource_group.platform.id
 }
+
+
+output "virtual_network_name" {
+  description = "Name of the platform virtual network"
+  value       = azurerm_virtual_network.platform.name
+}
+
+output "virtual_network_id" {
+  description = "Resource ID of the platform virtual network"
+  value       = azurerm_virtual_network.platform.id
+}
+
+output "application_subnet_id" {
+  description = "Resource ID of the application subnet"
+  value       = azurerm_subnet.app.id
+}
+
