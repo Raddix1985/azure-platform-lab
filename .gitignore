@@ -26,3 +26,8 @@ override.tf.json
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Terraform state and backups
+*.tfstate
+*.tfstate.*
+terraform-state-export.json
