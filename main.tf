@@ -8,6 +8,15 @@ terraform {
       version = "~> 4.0"
     }
   }
+
+
+  backend "azurerm" {
+    resource_group_name  = "rg-simplicreate-tfstate"
+    storage_account_name = "scplatformtfstate2026"
+    container_name       = "tfstate"
+    key                  = "platform-dev.tfstate"
+    use_azuread_auth     = true
+  }
 }
 
 provider "azurerm" {

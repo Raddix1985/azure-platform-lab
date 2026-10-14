@@ -1,45 +1,24 @@
 
-name: Terraform CI
+name: Terraform Deploy
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Confirm deployment to the dev environment"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  validate:
-    name: Format and validate Terraform
+  deploy:
+    name: Deploy Terraform to Azure
+    if: github.ref == 'refs/heads/main' && inputs.confirm_deploy == true
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.16.5"
-
-      - name: Check formatting
-        run: terraform fmt -check -recursive
-
-      - name: Initialize without backend
-        run: terraform init -backend=false
-
-      - name: Validate configuration
-        run: terraform validate
-
-  plan:
-    name: Terraform plan against Azure
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: dev
 
     permissions:
       contents: read
@@ -68,8 +47,17 @@ jobs:
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      - name: Initialize Terraform with remote state
+      - name: Initialize Terraform
         run: terraform init
 
-      - name: Generate Terraform plan
-        run: terraform plan -no-color
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Generate saved Terraform plan
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      - name: Apply saved Terraform plan
+        run: terraform apply -input=false -no-color tfplan
