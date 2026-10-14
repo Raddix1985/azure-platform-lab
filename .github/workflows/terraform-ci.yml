@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   validate:
@@ -30,31 +29,47 @@ jobs:
       - name: Check formatting
         run: terraform fmt -check -recursive
 
-      - name: Initialise Terraform
+      - name: Initialize without backend
         run: terraform init -backend=false
 
       - name: Validate configuration
         run: terraform validate
 
-  azure-auth:
-    name: Test Azure OIDC authentication
+  plan:
+    name: Terraform plan against Azure
     runs-on: ubuntu-latest
     needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
       id-token: write
 
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: "239c3186-45e5-49b5-b406-ba0b44ebd5ba"
+      ARM_TENANT_ID: "0478391b-2ecf-4e4d-9187-e2ba4e803624"
+      ARM_SUBSCRIPTION_ID: "5ec2fb09-eb60-4823-a43e-bcde9564bfe0"
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.5"
+
       - name: Log in to Azure using OIDC
         uses: azure/login@v2
         with:
-          client-id: 239c3186-45e5-49b5-b406-ba0b44ebd5ba
-          tenant-id: 0478391b-2ecf-4e4d-9187-e2ba4e803624
-          subscription-id: 5ec2fb09-eb60-4823-a43e-bcde9564bfe0
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      - name: Verify Azure authentication
-        run: az account show --query "{name:name, tenantId:tenantId}" --output table
+      - name: Initialize Terraform with remote state
+        run: terraform init
+
+      - name: Generate Terraform plan
+        run: terraform plan -no-color
