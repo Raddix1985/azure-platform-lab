@@ -72,4 +72,18 @@ resource "azurerm_subnet_network_security_group_association" "app" {
   network_security_group_id = azurerm_network_security_group.app.id
 }
 
+resource "azurerm_container_registry" "acr" {
+  name                = "crsimplicreateplatformdev"
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+  sku                 = "Basic"
+  admin_enabled       = false
+
+  tags = {
+    project     = "azure-platform-lab"
+    environment = var.environment
+    managed_by  = "terraform"
+  }
+}
+
 
