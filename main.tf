@@ -1,4 +1,3 @@
-
 terraform {
   required_version = ">= 1.6.0"
 
@@ -8,7 +7,6 @@ terraform {
       version = "~> 4.0"
     }
   }
-
 
   backend "azurerm" {
     resource_group_name  = "rg-simplicreate-tfstate"
@@ -54,7 +52,6 @@ resource "azurerm_subnet" "app" {
   address_prefixes     = ["10.10.1.0/24"]
 }
 
-
 resource "azurerm_network_security_group" "app" {
   name                = "nsg-simplicreate-app-dev"
   location            = azurerm_resource_group.platform.location
@@ -72,18 +69,85 @@ resource "azurerm_subnet_network_security_group_association" "app" {
   network_security_group_id = azurerm_network_security_group.app.id
 }
 
-resource "azurerm_container_registry" "acr" {
+# Use only the data block to reference the existing registry
+data "azurerm_container_registry" "acr" {
   name                = "crsimplicreateplatformdev"
   resource_group_name = azurerm_resource_group.platform.name
-  location            = azurerm_resource_group.platform.location
-  sku                 = "Basic"
-  admin_enabled       = false
-
-  tags = {
-    project     = "azure-platform-lab"
-    environment = var.environment
-    managed_by  = "terraform"
-  }
 }
 
+resource "azurerm_log_analytics_workspace" "platform" {
+  name                = "law-simplicreate-dev"
+  location            = azurerm_resource_group.platform.location
+  resource_group_name = azurerm_resource_group.platform.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
 
+resource "azurerm_container_app_environment" "platform" {
+  name                       = "cae-simplicreate-dev"
+  location                   = azurerm_resource_group.platform.location
+  resource_group_name        = azurerm_resource_group.platform.name
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.platform.id
+}
+
+resource "azurerm_user_assigned_identity" "aca_identity" {
+  name                = "mi-simplicreate-aca-dev"
+  location            = azurerm_resource_group.platform.location
+  resource_group_name = azurerm_resource_group.platform.name
+}
+
+resource "azurerm_role_assignment" "acr_pull" {
+  scope                = data.azurerm_container_registry.acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+}
+
+resource "azurerm_container_app" "api" {
+  name                         = "ca-platform-api-dev"
+  container_app_environment_id = azurerm_container_app_environment.platform.id
+  resource_group_name          = azurerm_resource_group.platform.name
+  revision_mode                = "Single"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aca_identity.id]
+  }
+
+  registry {
+    server   = data.azurerm_container_registry.acr.login_server
+    identity = azurerm_user_assigned_identity.aca_identity.id
+  }
+
+  template {
+    container {
+      name   = "platform-api"
+      image  = "${data.azurerm_container_registry.acr.login_server}/platform-lab-api:1.0.0"
+      cpu    = 0.25
+      memory = "0.5Gi"
+
+      env {
+        name  = "APP_VERSION"
+        value = "1.0.0"
+      }
+      env {
+        name  = "APP_ENV"
+        value = "azure-container-app"
+      }
+    }
+
+    min_replicas = 0
+    max_replicas = 1
+  }
+
+  ingress {
+    allow_insecure_connections = false
+    external_enabled           = true
+    target_port                = 8000
+    traffic_weight {
+      percentage      = 100
+      latest_revision = true
+    }
+  }
+
+  depends_on = [azurerm_role_assignment.acr_pull]
+}
