@@ -42,7 +42,7 @@ output "container_registry_login_server" {
 
 /*
 ==============================================================================
-TEMPORAILY COMMENTED OUT:
+TEMPORAILY COMMENTED OUT: Restore after docker run
 ============================================================================== 
 output "api_fqdn" {
   description = "The fully qualified domain name of the API Container App"
