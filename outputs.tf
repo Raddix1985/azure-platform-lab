@@ -40,12 +40,7 @@ output "container_registry_login_server" {
   value       = azurerm_container_registry.acr.login_server
 }
 
-/*
-==============================================================================
-TEMPORAILY COMMENTED OUT: Restore after docker run
-============================================================================== 
 output "api_fqdn" {
   description = "The fully qualified domain name of the API Container App"
   value       = "https://${azurerm_container_app.api.latest_revision_fqdn}"
 }
-*/

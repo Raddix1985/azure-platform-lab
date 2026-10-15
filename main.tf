@@ -82,15 +82,7 @@ resource "azurerm_subnet_network_security_group_association" "app" {
   subnet_id                 = azurerm_subnet.app.id
   network_security_group_id = azurerm_network_security_group.app.id
 }
-/*
-resource "azurerm_container_registry" "acr" {
-  name                = "crsimplicreateplatformdev"
-  resource_group_name = azurerm_resource_group.platform.name
-  location            = azurerm_resource_group.platform.location
-  sku                 = "Basic"
-  admin_enabled       = false
-}
-*/
+
 
 resource "azurerm_log_analytics_workspace" "platform" {
   name                = "law-simplicreate-dev"
@@ -113,11 +105,7 @@ resource "azurerm_user_assigned_identity" "aca_identity" {
   resource_group_name = azurerm_resource_group.platform.name
 }
 
-/* 
-===================================================================
-TEMPORARILY COMMENTED OUT: We must create the registry and push the 
-Docker image before Terraform can provision the Container App.
-===================================================================
+
 
 resource "azurerm_role_assignment" "acr_pull" {
   scope                = azurerm_container_registry.acr.id
@@ -157,7 +145,7 @@ resource "azurerm_container_app" "api" {
         value = "azure-container-app"
       }
     }
-    
+
     min_replicas = 0
     max_replicas = 1
   }
@@ -174,4 +162,3 @@ resource "azurerm_container_app" "api" {
 
   depends_on = [azurerm_role_assignment.acr_pull]
 }
-*/
