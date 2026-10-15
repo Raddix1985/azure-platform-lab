@@ -32,16 +32,20 @@ output "application_subnet_id" {
 
 output "container_registry_name" {
   description = "Name of the Azure Container Registry"
-  value       = data.azurerm_container_registry.acr.name
+  value       = azurerm_container_registry.acr.name
 }
 
 output "container_registry_login_server" {
   description = "Login server for Azure Container Registry"
-  value       = data.azurerm_container_registry.acr.login_server
+  value       = azurerm_container_registry.acr.login_server
 }
 
+/*
+==============================================================================
+TEMPORAILY COMMENTED OUT:
+============================================================================== 
 output "api_fqdn" {
   description = "The fully qualified domain name of the API Container App"
   value       = "https://${azurerm_container_app.api.latest_revision_fqdn}"
 }
-
+*/
