@@ -64,16 +64,33 @@ resource "azurerm_network_security_group" "app" {
   }
 }
 
+resource "azurerm_container_registry" "acr" {
+  name                = "crsimplicreateplatformdev"
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+  sku                 = "Basic"
+  admin_enabled       = false
+
+  tags = {
+    project     = "azure-platform-lab"
+    environment = var.environment
+    managed_by  = "terraform"
+  }
+}
+
 resource "azurerm_subnet_network_security_group_association" "app" {
   subnet_id                 = azurerm_subnet.app.id
   network_security_group_id = azurerm_network_security_group.app.id
 }
-
-# Use only the data block to reference the existing registry
-data "azurerm_container_registry" "acr" {
+/*
+resource "azurerm_container_registry" "acr" {
   name                = "crsimplicreateplatformdev"
   resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+  sku                 = "Basic"
+  admin_enabled       = false
 }
+*/
 
 resource "azurerm_log_analytics_workspace" "platform" {
   name                = "law-simplicreate-dev"
@@ -96,8 +113,14 @@ resource "azurerm_user_assigned_identity" "aca_identity" {
   resource_group_name = azurerm_resource_group.platform.name
 }
 
+/* 
+===================================================================
+TEMPORARILY COMMENTED OUT: We must create the registry and push the 
+Docker image before Terraform can provision the Container App.
+===================================================================
+
 resource "azurerm_role_assignment" "acr_pull" {
-  scope                = data.azurerm_container_registry.acr.id
+  scope                = azurerm_container_registry.acr.id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
 }
@@ -114,14 +137,14 @@ resource "azurerm_container_app" "api" {
   }
 
   registry {
-    server   = data.azurerm_container_registry.acr.login_server
+    server   = azurerm_container_registry.acr.login_server
     identity = azurerm_user_assigned_identity.aca_identity.id
   }
 
   template {
     container {
       name   = "platform-api"
-      image  = "${data.azurerm_container_registry.acr.login_server}/platform-lab-api:1.0.0"
+      image  = "${azurerm_container_registry.acr.login_server}/platform-lab-api:1.0.0"
       cpu    = 0.25
       memory = "0.5Gi"
 
@@ -134,7 +157,7 @@ resource "azurerm_container_app" "api" {
         value = "azure-container-app"
       }
     }
-
+    
     min_replicas = 0
     max_replicas = 1
   }
@@ -151,3 +174,4 @@ resource "azurerm_container_app" "api" {
 
   depends_on = [azurerm_role_assignment.acr_pull]
 }
+*/
