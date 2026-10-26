@@ -31,3 +31,33 @@ Thumbs.db
 *.tfstate
 *.tfstate.*
 terraform-state-export.json
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+junit.xml
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Docker
+.docker/
+
+# IDE and tooling caches
+.mypy_cache/
+.ruff_cache/
+.pyright/
