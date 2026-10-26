@@ -27,7 +27,7 @@ jobs:
     env:
       ARM_USE_OIDC: "true"
       ARM_USE_AZUREAD: "true"
-      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_ID: "239c3186-45e5-49b5-b406-ba0b44ebd5ba"
       ARM_TENANT_ID: "0478391b-2ecf-4e4d-9187-e2ba4e803624"
       ARM_SUBSCRIPTION_ID: "5ec2fb09-eb60-4823-a43e-bcde9564bfe0"
 
