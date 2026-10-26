@@ -59,3 +59,39 @@ jobs:
 
       - name: Build Docker image
         run: docker build --tag platform-lab-api:ci .
+
+  publish:
+    name: Publish image to ACR
+    runs-on: ubuntu-latest
+    needs: [test, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sign in to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: 239c3186-45e5-49b5-b406-ba0b44ebd5ba
+          tenant-id: 0478391b-2ecf-4e4d-9187-e2ba4e803624
+          subscription-id: 5ec2fb09-eb60-4823-a43e-bcde9564bfe0
+
+      - name: Authenticate Docker with ACR
+        run: az acr login --name crsimplicreateplatformdev
+
+      - name: Build and publish image
+        env:
+          IMAGE: crsimplicreateplatformdev.azurecr.io/platform-lab-api
+        run: |
+          docker build \
+            -t "$IMAGE:${GITHUB_SHA}" \
+            -t "$IMAGE:latest" \
+            .
+
+          docker push "$IMAGE:${GITHUB_SHA}"
+          docker push "$IMAGE:latest"
