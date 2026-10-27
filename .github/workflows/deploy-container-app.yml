@@ -41,9 +41,11 @@ jobs:
         shell: bash
         run: |
           if [[ ! "$IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
-            echo "Invalid image tag format."
+            echo "Invalid image tag format: '$IMAGE_TAG'"
             exit 1
           fi
+
+          echo "Image tag format is valid: $IMAGE_TAG"
 
       - name: Confirm image exists in ACR
         env:
