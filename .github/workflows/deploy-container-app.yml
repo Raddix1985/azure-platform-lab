@@ -20,7 +20,7 @@ jobs:
       contents: read
       id-token: write
 
-    environment: production
+    environment: dev
 
     env:
       RESOURCE_GROUP: rg-simplicreate-platform-dev
