@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 
 const API_BASE_URL =
   "https://ca-platform-api-dev.niceglacier-a0a859bb.southafricanorth.azurecontainerapps.io";
 
 export async function GET() {
+  await connection();
+
   const checkedAt = new Date().toISOString();
 
   try {

@@ -44,14 +44,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+  const initialCheck = window.setTimeout(() => {
     void checkApi();
+  }, 0);
 
-    const interval = window.setInterval(() => {
-      void checkApi();
-    }, 30_000);
+  const interval = window.setInterval(() => {
+    void checkApi();
+  }, 30_000);
 
-    return () => window.clearInterval(interval);
-  }, [checkApi]);
+  return () => {
+    window.clearTimeout(initialCheck);
+    window.clearInterval(interval);
+  };
+}, [checkApi]);
 
   const operational = api.status === "healthy";
 
