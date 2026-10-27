@@ -1,0 +1,112 @@
+name: Deploy Container App
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Published ACR image tag (prefer a full commit SHA)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy selected image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    environment: production
+
+    env:
+      RESOURCE_GROUP: rg-simplicreate-platform-dev
+      CONTAINER_APP: ca-platform-api-dev
+      IMAGE: crsimplicreateplatformdev.azurecr.io/platform-lab-api
+
+    steps:
+      - name: Sign in to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: 239c3186-45e5-49b5-b406-ba0b44ebd5ba
+          tenant-id: 0478391b-2ecf-4e4d-9187-e2ba4e803624
+          subscription-id: 5ec2fb09-eb60-4823-a43e-bcde9564bfe0
+
+      - name: Validate image tag
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        shell: bash
+        run: |
+          if [[ ! "$IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid image tag format."
+            exit 1
+          fi
+
+      - name: Confirm image exists in ACR
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        shell: bash
+        run: |
+          az acr repository show-tags \
+            --name crsimplicreateplatformdev \
+            --repository platform-lab-api \
+            --output tsv |
+            grep -Fx -- "$IMAGE_TAG" >/dev/null || {
+              echo "Image tag '$IMAGE_TAG' was not found in ACR."
+              exit 1
+            }
+
+      - name: Deploy selected image
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        shell: bash
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$IMAGE:$IMAGE_TAG" \
+            --set-env-vars \
+              "APP_VERSION=$IMAGE_TAG" \
+              "APP_ENV=azure-container-app"
+
+      - name: Verify deployment
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        shell: bash
+        run: |
+          FQDN=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.configuration.ingress.fqdn" \
+            --output tsv)
+
+          echo "Waiting for application health check..."
+
+          for attempt in {1..18}; do
+            if curl --fail --silent "https://$FQDN/health"; then
+              echo
+              break
+            fi
+
+            if [ "$attempt" -eq 18 ]; then
+              echo "Health check failed after deployment."
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+          RESPONSE=$(curl --fail --silent "https://$FQDN/version")
+          echo "Version endpoint: $RESPONSE"
+
+          ACTUAL_VERSION=$(echo "$RESPONSE" | jq -r '.version')
+
+          if [ "$ACTUAL_VERSION" != "$IMAGE_TAG" ]; then
+            echo "Expected version $IMAGE_TAG, got $ACTUAL_VERSION"
+            exit 1
+          fi
+
+          echo "Deployment verified successfully."
