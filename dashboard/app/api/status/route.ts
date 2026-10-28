@@ -1,12 +1,21 @@
 import { connection, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  "https://ca-platform-api-dev.niceglacier-a0a859bb.southafricanorth.azurecontainerapps.io";
+function getApiBaseUrl(): string {
+  const apiBaseUrl = process.env.API_BASE_URL;
+
+  if (!apiBaseUrl) {
+    throw new Error("API_BASE_URL environment variable is not configured.");
+  }
+
+  return apiBaseUrl;
+}
 
 export async function GET() {
   await connection();
 
+  const API_BASE_URL = getApiBaseUrl();
   const checkedAt = new Date().toISOString();
+
 
   try {
     // Check both Azure endpoints independently.
