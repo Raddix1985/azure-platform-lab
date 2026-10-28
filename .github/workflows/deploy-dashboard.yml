@@ -1,0 +1,148 @@
+name: Deploy Dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dashboard-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy dashboard
+    runs-on: ubuntu-latest
+    environment: dev
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      RESOURCE_GROUP: rg-simplicreate-platform-dev
+      CONTAINER_APP: ca-simplicreate-dashboard-dev
+      CONTAINER_ENV: cae-simplicreate-dev
+      ACR_NAME: crsimplicreateplatformdev
+      ACR_LOGIN_SERVER: crsimplicreateplatformdev.azurecr.io
+      IMAGE: crsimplicreateplatformdev.azurecr.io/simplicreate-dashboard
+      API_BASE_URL: https://ca-platform-api-dev.niceglacier-a0a859bb.southafricanorth.azurecontainerapps.io
+      USER_ASSIGNED_IDENTITY: /subscriptions/5ec2fb09-eb60-4823-a43e-bcde9564bfe0/resourceGroups/rg-simplicreate-platform-dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mi-simplicreate-aca-dev
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sign in to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: 239c3186-45e5-49b5-b406-ba0b44ebd5ba
+          tenant-id: 0478391b-2ecf-4e4d-9187-e2ba4e803624
+          subscription-id: 5ec2fb09-eb60-4823-a43e-bcde9564bfe0
+
+      - name: Set image tag
+        shell: bash
+        run: |
+          echo "IMAGE_TAG=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "Dashboard image: $IMAGE:$GITHUB_SHA"
+
+      - name: Build and push dashboard image
+        shell: bash
+        run: |
+          az acr login --name "$ACR_NAME"
+
+          docker build \
+            --file dashboard/Dockerfile \
+            --tag "$IMAGE:$IMAGE_TAG" \
+            dashboard
+
+          docker push "$IMAGE:$IMAGE_TAG"
+
+      - name: Create or update dashboard Container App
+        shell: bash
+        run: |
+          if az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query name \
+            --output tsv >/dev/null 2>&1; then
+
+            echo "Dashboard Container App exists. Updating it."
+
+            az containerapp identity assign \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --user-assigned "$USER_ASSIGNED_IDENTITY"
+
+            az containerapp registry set \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --server "$ACR_LOGIN_SERVER" \
+              --identity "$USER_ASSIGNED_IDENTITY"
+
+            az containerapp update \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --image "$IMAGE:$IMAGE_TAG" \
+              --set-env-vars \
+                "API_BASE_URL=$API_BASE_URL"
+
+          else
+            echo "Dashboard Container App does not exist. Creating it."
+
+            az containerapp create \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --environment "$CONTAINER_ENV" \
+              --image "$IMAGE:$IMAGE_TAG" \
+              --user-assigned "$USER_ASSIGNED_IDENTITY" \
+              --registry-server "$ACR_LOGIN_SERVER" \
+              --registry-identity "$USER_ASSIGNED_IDENTITY" \
+              --target-port 3000 \
+              --ingress external \
+              --min-replicas 0 \
+              --max-replicas 1 \
+              --cpu 0.5 \
+              --memory 1.0Gi \
+              --env-vars \
+                "API_BASE_URL=$API_BASE_URL"
+          fi
+
+      - name: Verify dashboard deployment
+        shell: bash
+        run: |
+          FQDN=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.configuration.ingress.fqdn" \
+            --output tsv)
+
+          if [[ -z "$FQDN" || "$FQDN" == "None" ]]; then
+            echo "Could not determine the dashboard hostname."
+            exit 1
+          fi
+
+          echo "Dashboard URL: https://$FQDN"
+          echo "Waiting for dashboard API status to become healthy..."
+
+          for attempt in {1..24}; do
+            RESPONSE=$(curl \
+              --fail \
+              --silent \
+              "https://$FQDN/api/status" 2>/dev/null || true)
+
+            if [[ -n "$RESPONSE" ]] && \
+              echo "$RESPONSE" | jq -e '.status == "healthy"' >/dev/null 2>&1; then
+              echo "$RESPONSE" | jq .
+              echo "Dashboard deployment verified successfully."
+              exit 0
+            fi
+
+            echo "Attempt $attempt/24: dashboard is not healthy yet."
+            sleep 10
+          done
+
+          echo "Dashboard failed to become healthy within the verification window."
+          echo "Check the Container App revision and application logs."
+          exit 1
